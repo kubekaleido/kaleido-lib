@@ -1,0 +1,44 @@
+apiVersion: kubeido.hopto.org/v1
+kind: ModuleOverride
+metadata:
+  name: fin-infra
+
+global:
+  nodeSelector:
+    taco-lma: enabled
+  clusterName: cluster.local
+  default_password: tacopassword
+  default_user: taco
+
+charts:
+- name: fin-exporters
+  override:
+
+- name: prometheus
+  override:
+  values: 
+    # using this cmd: helm upgrade --install -n fin prometheus prometheus-community/prometheus -f fin-prometheus-value-operride.yaml --create-namespace
+    server:
+      nodeSelector: 
+        nfs: enabled
+      persistentVolume:
+        enabled: true
+        accessModes:
+        - ReadWriteOnce
+        mountPath: /data
+        size: 200Gi
+        storageClass: taco-storage
+      extraVolumes:
+      - name: raw-data
+        nfs:
+          path: /glu_vol
+          readOnly: false
+          server: 192.168.5.50
+      extraVolumeMounts:
+      - mountPath: /home
+        name: raw-data
+        readOnly: false
+
+- name: postgresql
+  override:
+

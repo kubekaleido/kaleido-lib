@@ -1,0 +1,17 @@
+apiVersion: kubeido.hopto.org/v1
+kind: ModuleOverride
+metadata:
+  name: opensearch
+
+global:
+  nodeSelector:
+    taco-lma: enabled
+  clusterName: cluster.local
+  default_password: tacoPassword1!
+
+charts:
+- name: opensearch
+  override:
+
+- name: opensearch-dashboards
+  override:

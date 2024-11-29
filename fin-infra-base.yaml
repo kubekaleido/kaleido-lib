@@ -1,0 +1,233 @@
+# ## Really needed fields
+# metadata:
+#   name: xxx
+# spec:
+#   chart:
+#     type|git|repository:
+#     -------------
+#     git: xxx
+#     path: xxx
+#     ref: xxx
+#     -------------
+#     repository: xxx
+#     name: xxx
+#     version: xxxx
+#   releaseName: xxx
+#   targetNamespace: xxx
+#   values:
+#     key1: xxx
+---
+apiVersion: kubeido.hopto.org/v1
+kind: Module
+metadata:
+  name: fin-exporters
+spec:
+  chart:
+    type: helmrepo
+    repository: https://kubeido.hopto.org/charts
+    name: fin-exporters
+    version: 1.0.0
+    origin: https://kubeido.hopto.org/charts
+  releaseName: fin-exporters
+  targetNamespace: fin
+  values: 
+---
+apiVersion: kubeido.hopto.org/v1
+kind: Module
+metadata:
+  name: prometheus
+spec:
+  chart:
+    type: helmrepo
+    repository: https://prometheus-community.github.io/helm-charts 
+    name: prometheus 
+    version: 25.23.0
+    origin: https://prometheus-community.github.io/helm-charts 
+  releaseName: prometheus
+  targetNamespace: fin
+  values: 
+    # using this cmd: helm upgrade --install -n fin prometheus prometheus-community/prometheus -f fin-prometheus-value-operride.yaml --create-namespace
+    server:
+      nodeSelector: 
+        nfs: enabled
+    #    taco-lma: enabled
+      persistentVolume:
+        enabled: true
+        accessModes:
+        - ReadWriteOnce
+        mountPath: /data
+        size: 200Gi
+        storageClass: taco-storage
+      service:
+        enabled: true
+        servicePort: 80
+        nodePort: 30007
+        sessionAffinity: None
+        type: NodePort
+
+        ## If using a statefulSet (statefulSet.enabled=true), configure the
+        ## service to connect to a specific replica to have a consistent view
+        ## of the data.
+        statefulsetReplica:
+          enabled: false
+          replica: 0
+
+        ## Additional port to define in the Service
+        additionalPorts: []
+        # additionalPorts:
+        # - name: authenticated
+        #   port: 8081
+        #   targetPort: 8081
+      retention: "7000d"
+      retentionSize: ""
+
+    serverFiles:
+      prometheus.yml:
+        rule_files:
+        - /etc/config/recording_rules.yml
+        - /etc/config/alerting_rules.yml
+        ## Below two files are DEPRECATED will be removed from this default values file
+        - /etc/config/rules
+        - /etc/config/alerts
+
+        scrape_configs:
+        - job_name: binance-ohlcv
+          honor_labels: true
+          honor_timestamps: true
+          scrape_interval: 1m
+          scrape_timeout: 20s
+          metrics_path: /metrics
+          scheme: http
+          follow_redirects: true
+          enable_http2: true
+          # relabel_configs:
+          # - source_labels: [job]
+          #   action: drop
+          static_configs:
+          - targets: ["binance-ohlcv:8080"]
+        - job_name: exchange-info
+          honor_labels: true
+          honor_timestamps: true
+          scrape_interval: 1m
+          scrape_timeout: 20s
+          metrics_path: /metrics
+          scheme: http
+          follow_redirects: true
+          enable_http2: true
+          # relabel_configs:
+          # - source_labels: [job]
+          #   action: drop
+          static_configs:
+          - targets: ["exchange-info:8080"]
+
+    # do not install sub-charts
+    alertmanager:
+      enabled: false
+    kube-state-metrics:
+      enabled: false
+    prometheus-node-exporter:
+      enabled: false
+    prometheus-pushgateway:
+      enabled: false
+
+---
+apiVersion: kubeido.hopto.org/v1
+kind: Module
+metadata:
+  name: postgresql
+spec:
+  chart:
+    type: helmrepo
+    repository: https://charts.bitnami.com/bitnami
+    name: postgresql
+    version: 15.5.20 
+    origin: https://charts.bitnami.com/bitnami
+  releaseName: postgresql
+  targetNamespace: fin
+  values: 
+    global:
+      postgresql:
+        auth:
+          postgresPassword: {$default_password}
+          username: {$default_user}
+          password: {$default_password}
+          database: ""
+    primary:
+      persistence:
+        enabled: true
+        volumeName: "data"
+        existingClaim: ""
+        mountPath: /bitnami/postgresql
+        subPath: ""
+        storageClass: ""
+        accessModes:
+        - ReadWriteOnce
+        size: 20Gi
+
+---
+apiVersion: kubeido.hopto.org/v1
+kind: Module
+metadata:
+  name: mariadb
+spec:
+  chart:
+    type: helmrepo
+    repository: https://charts.bitnami.com/bitnami
+    name: mariadb
+    version: 19.0.3 
+    origin: https://charts.bitnami.com/bitnami
+  releaseName: mariadb
+  targetNamespace: fin
+  values: 
+    global:
+      defaultStorageClass: taco-storage
+      storageClass: rbd
+    clusterDomain: siim-dev
+    architecture: standalone
+    auth:
+      rootPassword: tacoword
+      database: fin
+      username: taco
+      password: tacoword
+    ## Example:
+    ## initdbScripts:
+    ##   my_init_script.sh: |
+    ##      #!/bin/bash
+    ##      echo "Do something."
+    initdbScripts: {}
+    primary:
+      updateStrategy:
+        type: RollingUpdate
+      nodeSelector: 
+        taco-lma: enabled
+      resources: {}
+      persistence:
+        enabled: true
+        storageClass: ""
+        accessModes:
+          - ReadWriteOnce
+        size: 500Gi
+      service:
+        type: NodePort
+        nodePorts:
+          mysql: 30306
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        namespace: taco-system
+        jobLabel: ""
+        interval: 30s
+        scrapeTimeout: ""
+        relabelings: []
+        metricRelabelings: []
+        honorLabels: false
+        selector: {}
+        labels: {}
+      prometheusRule:
+        enabled: false
+        namespace: ""
+        additionalLabels: {}
+        rules: []
+
+---

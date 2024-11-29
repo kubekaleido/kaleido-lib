@@ -1,0 +1,61 @@
+# ## Really needed fields
+# metadata:
+#   name: xxx
+# spec:
+#   chart:
+#     type|git|repository:
+#     -------------
+#     git: xxx
+#     path: xxx
+#     ref: xxx
+#     -------------
+#     repository: xxx
+#     name: xxx
+#     version: xxxx
+#   releaseName: xxx
+#   targetNamespace: xxx
+#   values:
+#     key1: xxx
+---
+apiVersion: kubeido.hopto.org/v1
+kind: Module
+metadata:
+  name: opensearch
+spec:
+  chart:
+    type: helmrepo
+    repository: https://opensearch-project.github.io/helm-charts/
+    name: opensearch
+    version: 2.21.0
+    origin: https://opensearch-project.github.io/helm-charts/
+  releaseName: opensearch
+  targetNamespace: opensearch
+  values: 
+    extraEnvs:
+    - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+      value: {$default_password}
+    persistence:
+      enabled: true
+      enableInitChown: true
+      accessModes:
+        - ReadWriteOnce
+      size: 200Gi
+---
+apiVersion: kubeido.hopto.org/v1
+kind: Module
+metadata:
+  name: opensearch-dashboard
+spec:
+  chart:
+    type: helmrepo
+    repository: https://opensearch-project.github.io/helm-charts/
+    name: opensearch-dashboard
+    version: 2.19.1
+    origin: https://opensearch-project.github.io/helm-charts/
+  releaseName: opensearch-dashboard
+  targetNamespace: opensearch
+  values: 
+    service:
+      type: NodePort
+      nodePort: 30601
+---
